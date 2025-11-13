@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CZN Faint Memory Calculator</title>
+<link rel="icon" type="image/png" href="https://img.gamewith.net/jp/img/d2ffa6837bb2840fe0729ab787d5b95f.png">
+<style>
+    :root{
+        --bg:#1e1e1e;--panel:#2d2d2d;--accent:#4ecdc4;--danger:#ff6b6b;
+        --warning:#ffa726;--text:#e0e0e0;--border:#444;--success:#66bb6a;--vivid:#9c27b0;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);}
+    .header{background:#111;padding:16px;border-bottom:1px solid var(--border);}
+    .header h1{margin:0 0 8px;font-size:1.5em;color:var(--accent);}
+    .header p{margin:4px 0;font-size:0.9em;color:#aaa;}
+    .toolbar{background:#1a1a1a;padding:12px 16px;display:flex;align-items:center;
+        border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;}
+    .toolbar button{background:var(--accent);border:none;color:#111;padding:8px 16px;
+        cursor:pointer;border-radius:4px;font-weight:600;}
+    .toolbar button:hover{background:#3ab8b0;}
+    .toolbar button.secondary{background:#555;color:#fff;}
+    .toolbar button.secondary:hover{background:#777;}
+    .toolbar .spacer{margin-left:auto;}
+    .container{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+        padding:20px;max-width:1600px;margin:0 auto;}
+    @media(max-width:1400px){.container{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:900px){.container{grid-template-columns:1fr;}}
+    .panel{background:var(--panel);border:1px solid var(--border);
+        border-radius:8px;padding:16px;}
+    .panel h3{margin:0 0 12px;font-size:1.2em;display:flex;align-items:center;
+        justify-content:space-between;}
+    .panel h3 input{background:transparent;border:none;color:var(--text);
+        font-size:inherit;font-weight:inherit;width:150px;}
+    .tier-config{background:#333;padding:12px;border-radius:6px;margin-bottom:12px;}
+    .tier-row{display:flex;gap:8px;align-items:center;margin:6px 0;}
+    .tier-row label{flex:1;font-size:0.9em;}
+    .tier-row select,.tier-row input[type=checkbox]{
+        background:#444;color:var(--text);border:1px solid var(--border);
+        border-radius:4px;padding:4px 8px;}
+    .tier-result{margin-top:8px;padding:8px;background:#444;border-radius:4px;
+        text-align:center;font-weight:600;color:var(--accent);}
+    .section-title{font-weight:600;margin:16px 0 8px;padding-bottom:4px;
+        border-bottom:1px solid var(--border);color:var(--accent);font-size:0.95em;}
+    .row{display:flex;align-items:center;margin:8px 0;gap:8px;}
+    .row label{flex:1;font-size:0.9em;}
+    .row input[type=number]{width:70px;background:#333;color:var(--text);
+        border:1px solid var(--border);border-radius:4px;padding:4px 8px;text-align:right;}
+    .row input[type=number]:focus{outline:none;border-color:var(--accent);}
+    .cost-breakdown{margin-top:16px;padding:12px;background:#333;border-radius:6px;}
+    .cost-item{display:flex;justify-content:space-between;margin:4px 0;font-size:0.9em;}
+    .cost-item.highlight{font-weight:600;color:var(--accent);}
+    .cost-item.vivid{color:var(--vivid);font-style:italic;}
+    .cost-total{margin-top:12px;padding-top:8px;border-top:1px solid var(--border);
+        display:flex;justify-content:space-between;font-weight:bold;font-size:1.1em;}
+    .limit-line{color:#aaa;font-size:0.9em;text-align:center;margin:8px 0;}
+    .status{margin-top:12px;padding:10px;border-radius:6px;text-align:center;font-weight:bold;}
+    .status.safe{background:var(--success);color:#fff;}
+    .status.warning{background:var(--warning);color:#111;}
+    .status.danger{background:var(--danger);color:#fff;}
+    .info-box{background:#2a2a2a;padding:8px;border-left:3px solid var(--accent);
+        margin:8px 0;font-size:0.85em;line-height:1.4;}
+    .panel-actions{margin-top:12px;display:flex;gap:8px;}
+    .panel-actions button{flex:1;background:#555;color:#fff;border:none;
+        padding:8px;border-radius:4px;cursor:pointer;font-size:0.85em;}
+    .panel-actions button:hover{background:#777;}
+    @keyframes slideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+    @keyframes slideOut{from{transform:translateX(0);}to{transform:translateX(100%);}}
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>CZN Faint Memory Calculator</h1>
+    <p><strong>Vivid</strong>: Equipment, Character Epiphanies, Unique Cards</p>
+    <p><strong>Faint</strong>: Common Cards, Divine Epiphanies, Removals, Duplications, Conversions</p>
+</div>
+<div class="toolbar">
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn" class="secondary">Load</button>
+    <button id="exportBtn" class="secondary">Export</button>
+    <div class="spacer"></div>
+    <button id="newRun">New Run</button>
+</div>
+<div class="container" id="panels"></div>
+
+<script>
+/* ==== COST TABLES ==== */
+const DUP_COST = [0, 10, 30, 50, 70];     // 1st=0, 2nd=10, 3rd=30, 4th=50, 5th+=70
+const REM_COST = [0, 10, 30, 50, 70];     // Same for removals
+
+function getDupCost(count) {
+    return count <= 0 ? 0 : (DUP_COST[count - 1] ?? 70);
+}
+function getRemCost(count) {
+    return count <= 0 ? 0 : (REM_COST[count - 1] ?? 70);
+}
+
+/* ==== STATE ==== */
+let state = [
+    {name:"Character 1", baseTier:1, nightmare:false, codex:0,
+     data:{neutral:0, neutralForbidden:0, monster:0, normalEpi:0, divineEpi:0,
+           removals:0, charRemovals:0,
+           dupNeutral:0, dupMonster:0, dupOther:0,
+           convNeutral:0, convMonster:0, convOther:0}},
+    {name:"Character 2", baseTier:1, nightmare:false, codex:0,
+     data:{neutral:0, neutralForbidden:0, monster:0, normalEpi:0, divineEpi:0,
+           removals:0, charRemovals:0,
+           dupNeutral:0, dupMonster:0, dupOther:0,
+           convNeutral:0, convMonster:0, convOther:0}},
+    {name:"Character 3", baseTier:1, nightmare:false, codex:0,
+     data:{neutral:0, neutralForbidden:0, monster:0, normalEpi:0, divineEpi:0,
+           removals:0, charRemovals:0,
+           dupNeutral:0, dupMonster:0, dupOther:0,
+           convNeutral:0, convMonster:0, convOther:0}},
+];
+function calculateTier(ch) { return ch.baseTier + (ch.nightmare ? 1 : 0) + ch.codex; }
+function calculateLimit(t) { return 30 + 10 * (t - 1); }
+
+/* ==== STORAGE ==== */
+const STORAGE_KEY = 'czn_final_v4';
+function loadState() {
+    try { const s = localStorage.getItem(STORAGE_KEY); if (s) state = JSON.parse(s); }
+    catch (e) { console.error('Load failed:', e); }
+}
+function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); showNotification('Saved!'); }
+    catch (e) { console.error('Save failed:', e); alert('Failed to save'); }
+}
+function showNotification(msg) {
+    const n = document.createElement('div');
+    n.textContent = msg;
+    n.style.cssText = 'position:fixed;top:80px;right:20px;background:var(--success);color:#fff;padding:12px 20px;border-radius:6px;z-index:1000;animation:slideIn .3s;box-shadow:0 4px 12px rgba(0,0,0,.3);';
+    document.body.appendChild(n);
+    setTimeout(() => { n.style.animation = 'slideOut .3s'; setTimeout(() => n.remove(), 300); }, 2500);
+}
+
+/* ==== RENDER ==== */
+const container = document.getElementById('panels');
+function renderAll() { container.innerHTML = ''; state.forEach((c, i) => renderPanel(c, i)); }
+function renderPanel(ch, idx) {
+    const tier = calculateTier(ch);
+    const d = ch.data;
+    const p = document.createElement('div'); p.className = 'panel';
+    p.innerHTML = `
+        <h3><input type="text" value="${ch.name}" class="name-input" data-idx="${idx}" maxlength="20"></h3>
+        <div class="tier-config">
+            <div class="tier-row"><label>Base Tier:</label>
+                <select class="base-tier" data-idx="${idx}">
+                    ${[1,2,3,4,5,6,7,8,9,10].map(t=>`<option value="${t}" ${ch.baseTier===t?'selected':''}>Tier ${t}</option>`).join('')}
+                </select>
+            </div>
+            <div class="tier-row"><label>Nightmare (+1):</label>
+                <input type="checkbox" class="nightmare" data-idx="${idx}" ${ch.nightmare?'checked':''}>
+            </div>
+            <div class="tier-row"><label>Codex:</label>
+                <select class="codex" data-idx="${idx}">
+                    <option value="0" ${ch.codex===0?'selected':''}>None</option>
+                    <option value="1" ${ch.codex===1?'selected':''}>+1</option>
+                    <option value="2" ${ch.codex===2?'selected':''}>+2</option>
+                </select>
+            </div>
+            <div class="tier-result">Effective Tier: ${tier}</div>
+        </div>
+        <div class="section-title">Common Cards</div>
+        <div class="row"><label>Neutral (+20)</label><input type="number" min="0" value="${d.neutral}" class="val" data-type="neutral" data-idx="${idx}"></div>
+        <div class="row"><label>Forbidden (Vivid)</label><input type="number" min="0" value="${d.neutralForbidden}" class="val" data-type="neutralForbidden" data-idx="${idx}"></div>
+        <div class="row"><label>Monster (+80)</label><input type="number" min="0" value="${d.monster}" class="val" data-type="monster" data-idx="${idx}"></div>
+        <div class="section-title">Epiphanies</div>
+        <div class="info-box">Character epiphanies = Vivid (0pts)</div>
+        <div class="row"><label>Common Epiphanies (+10)</label><input type="number" min="0" value="${d.normalEpi}" class="val" data-type="normalEpi" data-idx="${idx}"></div>
+        <div class="row"><label>Divine Epiphanies (+20)</label><input type="number" min="0" value="${d.divineEpi}" class="val" data-type="divineEpi" data-idx="${idx}"></div>
+        <div class="section-title">Modifications</div>
+        <div class="row"><label>Removals (non-char)</label><input type="number" min="0" value="${d.removals}" class="val" data-type="removals" data-idx="${idx}"></div>
+        <div class="row"><label>Character Removals (+20)</label><input type="number" min="0" value="${d.charRemovals}" class="val" data-type="charRemovals" data-idx="${idx}"></div>
+        <div class="row"><label>Dup: Neutral (+0,+10,+30,+50,+70)</label><input type="number" min="0" value="${d.dupNeutral}" class="val" data-type="dupNeutral" data-idx="${idx}"></div>
+        <div class="row"><label>Dup: Monster (+0,+10,+30,+50,+70)</label><input type="number" min="0" value="${d.dupMonster}" class="val" data-type="dupMonster" data-idx="${idx}"></div>
+        <div class="row"><label>Dup: Other (+0,+10,+30,+50,+70)</label><input type="number" min="0" value="${d.dupOther}" class="val" data-type="dupOther" data-idx="${idx}"></div>
+        <div class="row"><label>Conv: Neutral (+30)</label><input type="number" min="0" value="${d.convNeutral}" class="val" data-type="convNeutral" data-idx="${idx}"></div>
+        <div class="row"><label>Conv: Monster (+90)</label><input type="number" min="0" value="${d.convMonster}" class="val" data-type="convMonster" data-idx="${idx}"></div>
+        <div class="row"><label>Conv: Other (+10)</label><input type="number" min="0" value="${d.convOther}" class="val" data-type="convOther" data-idx="${idx}"></div>
+        <div class="cost-breakdown">
+            <div class="cost-item"><span>Neutral Cards:</span><span class="cost-neutral">0</span></div>
+            <div class="cost-item vivid"><span>Forbidden:</span><span>0 (Vivid)</span></div>
+            <div class="cost-item"><span>Monster Cards:</span><span class="cost-monster">0</span></div>
+            <div class="cost-item"><span>Common Epiphanies:</span><span class="cost-epi">0</span></div>
+            <div class="cost-item"><span>Divine Epiphanies:</span><span class="cost-divine">0</span></div>
+            <div class="cost-item highlight"><span>Removals:</span><span class="cost-removal">0</span></div>
+            <div class="cost-item highlight"><span>Duplications:</span><span class="cost-dup">0</span></div>
+            <div class="cost-item highlight"><span>Conversions:</span><span class="cost-convert">0</span></div>
+            <div class="cost-total"><span>Total Faint:</span><span class="total">0</span></div>
+        </div>
+        <div class="limit-line">Tier ${tier} Limit: <span class="limit">0</span></div>
+        <div class="status safe">Within Limit</div>
+        <div class="panel-actions">
+            <button class="copy-btn">Copy</button>
+            <button class="clear-btn">Clear</button>
+        </div>`;
+    container.appendChild(p);
+    updatePanel(idx);
+}
+
+/* ==== CALCULATION ==== */
+function calcCharacter(idx) {
+    const d = state[idx].data;
+
+    // Base cards
+    const neutralCost = d.neutral * 20;
+    const monsterCost = d.monster * 80;
+    const epiCost = d.normalEpi * 10;
+    const divineCost = d.divineEpi * 20;
+
+    // REMOVALS
+    let removalCost = 0;
+    for (let i = 1; i <= d.removals; i++) removalCost += getRemCost(i);
+    for (let i = 1; i <= d.charRemovals; i++) removalCost += getRemCost(i) + 20;
+
+    // DUPLICATIONS — ALL use same cost table: 0,10,30,50,70
+    let dupCost = 0;
+    for (let i = 1; i <= d.dupNeutral; i++) dupCost += getDupCost(i);
+    for (let i = 1; i <= d.dupMonster; i++) dupCost += getDupCost(i);
+    for (let i = 1; i <= d.dupOther; i++) dupCost += getDupCost(i);
+
+    // CONVERSIONS
+    const convCost = (d.convNeutral * 30) + (d.convMonster * 90) + (d.convOther * 10);
+
+    const total = neutralCost + monsterCost + epiCost + divineCost + removalCost + dupCost + convCost;
+    return { neutralCost, monsterCost, epiCost, divineCost, removalCost, dupCost, convCost, total };
+}
+
+function updatePanel(idx) {
+    const panel = container.children[idx];
+    if (!panel) return;
+    const c = calcCharacter(idx);
+    const tier = calculateTier(state[idx]);
+    const limit = calculateLimit(tier);
+    panel.querySelector('.cost-neutral').textContent = c.neutralCost;
+    panel.querySelector('.cost-monster').textContent = c.monsterCost;
+    panel.querySelector('.cost-epi').textContent = c.epiCost;
+    panel.querySelector('.cost-divine').textContent = c.divineCost;
+    panel.querySelector('.cost-removal').textContent = c.removalCost;
+    panel.querySelector('.cost-dup').textContent = c.dupCost;
+    panel.querySelector('.cost-convert').textContent = c.convCost;
+    panel.querySelector('.total').textContent = c.total;
+    panel.querySelector('.limit').textContent = limit;
+
+    const status = panel.querySelector('.status');
+    const rem = limit - c.total;
+    if (rem >= 20) { status.textContent = `Safe: ${rem}pts`; status.className = 'status safe'; }
+    else if (rem >= 0) { status.textContent = `Close: ${rem}pts`; status.className = 'status warning'; }
+    else { status.textContent = `OVER by ${-rem}pts!`; status.className = 'status danger'; }
+}
+
+/* ==== EVENTS ==== */
+container.addEventListener('input', e => {
+    if (e.target.classList.contains('val')) {
+        const idx = +e.target.dataset.idx;
+        const type = e.target.dataset.type;
+        state[idx].data[type] = +e.target.value || 0;
+        updatePanel(idx);
+    } else if (e.target.classList.contains('name-input')) {
+        state[+e.target.dataset.idx].name = e.target.value;
+    }
+});
+container.addEventListener('change', e => {
+    const idx = +e.target.dataset.idx;
+    if (e.target.classList.contains('base-tier')) { state[idx].baseTier = +e.target.value; renderPanel(state[idx], idx); }
+    else if (e.target.classList.contains('nightmare')) { state[idx].nightmare = e.target.checked; renderPanel(state[idx], idx); }
+    else if (e.target.classList.contains('codex')) { state[idx].codex = +e.target.value; renderPanel(state[idx], idx); }
+});
+container.addEventListener('click', e => {
+    const panel = e.target.closest('.panel');
+    if (!panel) return;
+    const idx = Array.from(container.children).indexOf(panel);
+    if (e.target.classList.contains('clear-btn')) {
+        if (confirm('Clear this character?')) {
+            state[idx].data = {neutral:0,neutralForbidden:0,monster:0,normalEpi:0,divineEpi:0,
+                               removals:0,charRemovals:0,dupNeutral:0,dupMonster:0,dupOther:0,
+                               convNeutral:0,convMonster:0,convOther:0};
+            renderAll();
+        }
+    } else if (e.target.classList.contains('copy-btn')) {
+        navigator.clipboard.writeText(JSON.stringify(state[idx], null, 2)).then(() => showNotification('Copied!'));
+    }
+});
+
+/* ==== TOOLBAR ==== */
+document.getElementById('saveBtn').onclick = saveState;
+document.getElementById('loadBtn').onclick = () => { if (confirm('Load?')) { loadState(); renderAll(); } };
+document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `czn-${new Date().toISOString().slice(0,10)}.json`; a.click();
+    URL.revokeObjectURL(url); showNotification('Exported!');
+};
+document.getElementById('newRun').onclick = () => {
+    if (confirm('New run?')) {
+        state.forEach((c, i) => {
+            c.name = `Character ${i+1}`; c.baseTier = 1; c.nightmare = false; c.codex = 0;
+            c.data = {neutral:0,neutralForbidden:0,monster:0,normalEpi:0,divineEpi:0,
+                      removals:0,charRemovals:0,dupNeutral:0,dupMonster:0,dupOther:0,
+                      convNeutral:0,convMonster:0,convOther:0};
+        });
+        renderAll(); showNotification('New run!');
+    }
+};
+
+/* ==== INIT ==== */
+loadState(); renderAll();
+</script>
+</body>
+</html>
