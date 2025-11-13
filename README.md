@@ -22,6 +22,13 @@ Perfect for planning card limits across 3 characters without exceeding tier-base
 
 > No server. No tracking. All data stays in your browser.
 
+
+## Demo
+
+![CZN Calculator](https://github.com/user-attachments/assets/bcd47324-f692-47b2-9c36-df652371368d)
+
+
+
 ---
 
 ## Features
